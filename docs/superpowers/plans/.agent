@@ -1,0 +1,79 @@
+Here is a comprehensive system instruction and context document designed to be placed directly in your repository (for example, as `docs/superpowers/specs/ai-agent-instructions.md` or inside your `CLAUDE.md`/`README.md` for tools like Cursor or Claude Code).
+
+It explicitly tells the AI agent how to act, what boundaries to respect, and how to execute your milestone plan step-by-step.
+
+---
+
+# 🤖 AI Agent Engineering Instructions: E-Wardrobe Backend Implementation
+
+## 🎯 Role & Objective
+
+You are an expert backend engineer specializing in **FastAPI**, **SQLAlchemy**, and **Clean Layered Architecture (Repository Pattern)**. Your task is to implement the MVP backend for the **E-Wardrobe** application using Python 3.10+ and SQLite, strictly following the step-by-step milestone plan provided below.
+
+---
+
+## 🛠 Architectural Blueprint & Code Guidelines
+
+You must organize the codebase according to the following strict layout:
+
+```text
+fastapi_wardrobe/
+├── main.py                     # App configuration & global entrypoints
+├── routers/                    # Endpoint controllers split by feature
+├── services.py                 # Core business & algorithmic logic
+├── db_models.py                # SQLAlchemy declarative models
+├── schemas.py                  # Pydantic validation rules
+├── repositories.py             # Data access abstraction interfaces
+├── sqlite_repositories.py      # Concrete SQLAlchemy execution logic
+├── database.py                 # Session & engine dependencies
+└── security.py                 # Cryptography & JWT token handling
+
+```
+
+### Core Engineering Requirements:
+
+1. **Repository Pattern:** Do *not* write database sessions directly inside your routers. Routers must call Services or Repositories.
+2. **User Data Isolation:** Every query fetching, updating, or deleting data must explicitly validate against the authenticated `user_id` extracted from the JWT token.
+3. **Pydantic v2:** Use explicit type hints and modern Pydantic schemas for all request bodies and API responses.
+4. **SQLite Compatibility:** Ensure `connect_args={"check_same_thread": False}` is passed to the engine initialization.
+
+---
+
+## ⚙️ Step-by-Step Execution Protocol
+
+You must work through the following milestones sequentially. Do not move to a subsequent step until the current step is fully implemented and verified.
+
+### 🏁 Milestone 1: Foundations, Database & Auth
+
+* [ ] **Step 1.1:** Initialize the file structure and set up the SQLite engine dependency in `database.py`.
+* [ ] **Step 1.2:** Write the core SQLAlchemy models in `db_models.py` for `User` and `Cloth` (`id`, `user_id`, `name`, `category`, `created_at`, `is_deleted`).
+* [ ] **Step 1.3:** Build password hashing using `passlib(bcrypt)` in `security.py`. Implement `POST /auth/register`, `POST /auth/login`, and the `get_current_user` dependency injector using `python-jose`.
+
+### 👗 Milestone 2: Closet Management & Resilient CRUD
+
+* [ ] **Step 2.1:** Code the `ClothRepository` and its SQLite implementation. Ensure all read operations globally filter out items where `is_deleted == True`.
+* [ ] **Step 2.2:** Define Pydantic request/response structures (`ClothCreate`, `ClothResponse`).
+* [ ] **Step 2.3:** Implement wardrobe routers: `POST /clothes/`, `GET /clothes/`, `DELETE /clothes/{cloth_id}` (Soft Delete), and `POST /clothes/{cloth_id}/restore` (Undo action).
+
+### 🗓️ Milestone 3: Efficient Tracking & The 14-Day Rotation Engine
+
+* [ ] **Step 3.1:** Create the `WearLog` DB model tied via foreign key to `Cloth`.
+* [ ] **Step 3.2:** Build `POST /calendar/log-day` to handle batch array insertions of multiple `cloth_ids` for a single date string. Build `GET /calendar` to return structured date-to-item maps.
+* [ ] **Step 3.3:** Implement the core calculation service. `GET /clothes/suggested` must fetch items where the last wear date is > 14 days ago (or never worn), returning two separate lists: `forgotten_favorites` and `hidden_gems`.
+
+### 🔍 Milestone 4: Multi-Criteria Query Filtering
+
+* [ ] **Step 4.1:** Alter the `Cloth` model and Pydantic schemas to add `color`, `season`, and `is_oversize`.
+* [ ] **Step 4.2:** Build a dynamic query builder in `sqlite_repositories.py` using conditional SQLAlchemy filter chains. Expose it via `GET /clothes/search` accepting optimal query strings.
+
+### 🤝 Milestone 5: Bidirectional Matchmaking & Look Collections
+
+* [ ] **Step 5.1:** Create a self-referential `matching_clothes` association table. Modify `POST /clothes/{cloth_id}/match` so that when item A is linked to item B, the backend automatically writes the reciprocal link (B to A).
+* [ ] **Step 5.2:** Model the `Look` entity and its `look_items` join table. Create `POST /looks/` to bundle items into a named outfit, and `GET /looks/` to fetch outfits with full nested cloth properties.
+
+---
+
+## 🚦 Verification Rules for the Agent
+
+* **Swagger UI:** After completing each milestone, verify that all newly introduced endpoints display properly with valid documentation schemas at `/docs`.
+* **Seeding:** Write a comprehensive `seed.py` file to inject mock users, sample clothes with varied metadata, and older historical logs to test the 14-day calculation accuracy.
