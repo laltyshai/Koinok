@@ -11,7 +11,7 @@ Subsequent milestones will ADD to this file (WearLog, Look, etc.)
 without touching the existing definitions.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 
 from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String
 from sqlalchemy.orm import relationship
@@ -46,7 +46,7 @@ class ClothModel(Base):
     name: str = Column(String, nullable=False)
     category: str = Column(String, nullable=False)  # validated at application layer
     is_deleted: bool = Column(Boolean, default=False)
-    created_at: datetime = Column(DateTime, default=datetime.utcnow)
+    created_at: datetime = Column(DateTime, default=datetime.now(timezone(timedelta(hours=6))))
 
     # Many clothes → one user
     owner = relationship("UserModel", back_populates="clothes")
