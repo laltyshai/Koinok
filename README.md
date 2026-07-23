@@ -49,5 +49,57 @@ The system operates around three core data entities:
 
 ### Step 1: Clone the Repository
 ```bash
-git clone [https://github.com/your-username/e-wardrobe.git](https://github.com/your-username/e-wardrobe.git)
+git clone https://github.com/your-username/e-wardrobe.git
 cd e-wardrobe
+```
+
+### Step 2: Running the Python Backend
+
+The backend is built with FastAPI, SQLAlchemy, and SQLite. Follow these steps to set up and run the service:
+
+#### 1. Navigate to the backend directory
+```bash
+cd koinok_backend
+```
+
+#### 2. Create and activate a Virtual Environment
+On Windows (PowerShell/CMD):
+```powershell
+python -m venv venv
+.\venv\Scripts\activate
+```
+
+On macOS/Linux:
+```bash
+python3 -m venv venv
+source venv/bin/activate
+```
+
+#### 3. Install Dependencies
+```bash
+pip install -r requirements.txt
+```
+
+#### 4. Run the FastAPI Application
+Start the development server using Uvicorn:
+```bash
+python -m uvicorn main:app --reload --port 8000
+```
+The server will start on [http://127.0.0.1:8000](http://127.0.0.1:8000). You can access the interactive API docs (Swagger UI) at [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs).
+
+#### 5. Run Verification Smoke Tests
+With the FastAPI server running in one terminal, run the milestone verification tests in another terminal:
+```bash
+python test/smoke_test_m2.py
+```
+
+##Deleting Databse data
+For future test runs, you can clear the database with:
+
+from database import SessionLocal
+from db_models import UserModel
+
+db = SessionLocal()
+db.query(UserModel).delete()
+db.commit()
+db.close()
