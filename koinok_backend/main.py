@@ -13,9 +13,11 @@ Responsibilities:
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import PlainTextResponse
 
 from database import Base, engine
 from routers import auth as auth_router, wardrobe
+
 
 # ---------------------------------------------------------------------------
 # Create tables
@@ -62,3 +64,13 @@ app.include_router(wardrobe.router)
 def health():
     """Returns 200 OK when the server is running."""
     return {"status": "ok"}
+
+
+# ---------------------------------------------------------------------------
+# Root endpoint
+# ---------------------------------------------------------------------------
+@app.get("/", response_class=PlainTextResponse, tags=["System"], summary="Root endpoint")
+def index():
+    """Returns a simple text indicating the service is running."""
+    return "Koinok is alive"
+
