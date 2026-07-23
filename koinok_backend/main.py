@@ -15,7 +15,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from database import Base, engine
-from routers import auth as auth_router
+from routers import auth as auth_router, wardrobe
 
 # ---------------------------------------------------------------------------
 # Create tables
@@ -53,6 +53,7 @@ app.add_middleware(
 # Routers
 # ---------------------------------------------------------------------------
 app.include_router(auth_router.router)
+app.include_router(wardrobe.router)
 
 # ---------------------------------------------------------------------------
 # Health check

@@ -1,0 +1,95 @@
+"""
+routers/wardrobe.py
+-------------------
+Wardrobe API router.
+Provides endpoints for managing user's clothes, including soft-delete and restore.
+"""
+
+from typing import List
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.orm import Session
+
+from database import get_db
+from db_models import UserModel
+from security import get_current_user
+from repositories import ClothRepository
+import schemas
+
+router = APIRouter(prefix="/clothes", tags=["Wardrobe"])
+
+
+@router.post("/", response_model=schemas.ClothResponse, status_code=status.HTTP_201_CREATED, summary="Create a new clothing item")
+def create_cloth(
+    cloth_in: schemas.ClothCreate,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user)
+):
+    """Creates a new item in the authenticated user's closet."""
+    repo = ClothRepository(db)
+    return repo.create(cloth_in, user_id=current_user.id)
+
+
+@router.get("/", response_model=List[schemas.ClothResponse], summary="List all active clothing items")
+def get_user_clothes(
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user)
+):
+    """Retrieves all non-deleted clothing items belonging to the authenticated user."""
+    repo = ClothRepository(db)
+    return repo.get_all_by_user(user_id=current_user.id)
+
+
+@router.get("/{cloth_id}", response_model=schemas.ClothResponse, summary="Get clothing item by ID")
+def get_cloth_by_id(
+    cloth_id: int,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user)
+):
+    """Fetches a specific active item by ID. Raises 404 if missing or soft-deleted."""
+    repo = ClothRepository(db)
+    cloth = repo.get_by_id(cloth_id, user_id=current_user.id)
+    if not cloth:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Clothing item not found"
+        )
+    return cloth
+
+
+@router.delete("/{cloth_id}", response_model=schemas.ClothResponse, summary="Soft delete clothing item")
+def delete_cloth(
+    cloth_id: int,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user)
+):
+    """Soft deletes a clothing item. Raises 404 if missing or already soft-deleted."""
+    repo = ClothRepository(db)
+    cloth = repo.get_by_id(cloth_id, user_id=current_user.id)
+    if not cloth:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Clothing item not found"
+        )
+    return repo.soft_delete(cloth)
+
+
+@router.post("/{cloth_id}/restore", response_model=schemas.ClothResponse, summary="Restore soft-deleted item")
+def restore_cloth(
+    cloth_id: int,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user)
+):
+    """Restores a soft-deleted clothing item back to active status."""
+    repo = ClothRepository(db)
+    cloth = repo.get_by_id(cloth_id, user_id=current_user.id, include_deleted=True)
+    if not cloth:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Clothing item not found"
+        )
+    if not cloth.is_deleted:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Item is not deleted"
+        )
+    return repo.restore(cloth)

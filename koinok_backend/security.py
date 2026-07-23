@@ -35,7 +35,13 @@ ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24  # 24 hours
 # ---------------------------------------------------------------------------
 # Password hashing
 # ---------------------------------------------------------------------------
+# Workaround for passlib 1.7.4 compatibility with bcrypt >= 4.1.0 on Python 3.12+
+import bcrypt
+if not hasattr(bcrypt, "__about__"):
+    bcrypt.__about__ = type("About", (), {"__version__": getattr(bcrypt, "__version__", "4.0.0")})
+
 _pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
 
 
 def hash_password(password: str) -> str:
