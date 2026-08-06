@@ -15,11 +15,30 @@ Milestone 2 schemas:
   - ClothCreate    — cloth creation payload
   - ClothUpdate    — partial update payload
   - ClothResponse  — full cloth response schema
+
+
+
+
+
+
+
+
+
+
+
+
+
+Milestone 3 schemas:
+  - WearLogBase               — shared wear log fields
+  - BatchLogCreate            — batch daily wear log payload
+  - WearLogResponse           — wear log response schema
+  - CalendarDayResponse       — single-day calendar entry
+  - RotationSuggestionsResponse — 14-day rotation dashboard
 """
 
-from datetime import datetime
+from datetime import date, datetime
 from enum import Enum
-from typing import Optional
+from typing import List, Optional
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
@@ -68,6 +87,9 @@ class ClothCategory(str, Enum):
 class ClothBase(BaseModel):
     name: str = Field(..., min_length=1, max_length=100)
     category: ClothCategory = Field(default=ClothCategory.OTHER)
+    color: Optional[str] = Field(default=None, max_length=50)
+    season: Optional[str] = Field(default=None, max_length=50)
+    is_oversize: Optional[bool] = Field(default=False)
 
 
 class ClothCreate(ClothBase):
@@ -77,6 +99,9 @@ class ClothCreate(ClothBase):
 class ClothUpdate(BaseModel):
     name: Optional[str] = Field(default=None, min_length=1, max_length=100)
     category: Optional[ClothCategory] = None
+    color: Optional[str] = Field(default=None, max_length=50)
+    season: Optional[str] = Field(default=None, max_length=50)
+    is_oversize: Optional[bool] = None
 
 
 class ClothResponse(ClothBase):
@@ -86,3 +111,33 @@ class ClothResponse(ClothBase):
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+# ---------------------------------------------------------------------------
+# Wear Analytics schemas (Milestone 3)
+# ---------------------------------------------------------------------------
+class WearLogBase(BaseModel):
+    worn_date: date
+
+
+class BatchLogCreate(BaseModel):
+    cloth_ids: List[int] = Field(..., min_length=1)
+    worn_date: date
+
+
+class WearLogResponse(WearLogBase):
+    id: int
+    cloth_id: int
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class CalendarDayResponse(BaseModel):
+    date: date
+    items: List[ClothResponse]
+
+
+class RotationSuggestionsResponse(BaseModel):
+    forgotten_favorites: List[ClothResponse]
+    hidden_gems: List[ClothResponse]

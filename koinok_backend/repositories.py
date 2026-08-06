@@ -5,10 +5,12 @@ Data access repository layer for database operations.
 Isolates database queries and soft-delete logic from API routes.
 """
 
-from typing import Optional, Sequence
+from datetime import date
+from typing import Dict, List, Optional, Sequence, Tuple
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from db_models import ClothModel
+from db_models import ClothModel, WearLogModel
 import schemas
 
 
@@ -59,4 +61,109 @@ class ClothRepository:
         cloth.is_deleted = False
         self.db.commit()
         self.db.refresh(cloth)
-        return cloth
+        return cloth
+
+
+class WearLogRepository:
+    def __init__(self, db: Session):
+        self.db = db
+
+    def batch_log_day(
+        self,
+        cloth_ids: List[int],
+        user_id: int,
+        worn_date: date,
+    ) -> List[WearLogModel]:
+        """
+        Validates that all cloth_ids belong to user_id and are active,
+        then bulk-inserts new WearLogModel records (skipping duplicates).
+        Returns the newly created log entities.
+        """
+        # Validate ownership and active status
+        valid_clothes = (
+            self.db.query(ClothModel)
+            .filter(
+                ClothModel.id.in_(cloth_ids),
+                ClothModel.user_id == user_id,
+                ClothModel.is_deleted == False,
+            )
+            .all()
+        )
+        valid_ids = {c.id for c in valid_clothes}
+        invalid = set(cloth_ids) - valid_ids
+        if invalid:
+            from fastapi import HTTPException, status
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid or deleted cloth_ids: {sorted(invalid)}",
+            )
+
+        # Find already-existing logs on this date to avoid duplicates
+        existing_logs = (
+            self.db.query(WearLogModel.cloth_id)
+            .filter(
+                WearLogModel.cloth_id.in_(cloth_ids),
+                WearLogModel.worn_date == worn_date,
+            )
+            .all()
+        )
+        existing_cloth_ids = {row.cloth_id for row in existing_logs}
+
+        # Insert only new logs
+        new_logs = []
+        for cid in cloth_ids:
+            if cid not in existing_cloth_ids:
+                log = WearLogModel(cloth_id=cid, worn_date=worn_date)
+                self.db.add(log)
+                new_logs.append(log)
+
+        self.db.commit()
+        for log in new_logs:
+            self.db.refresh(log)
+
+        return new_logs
+
+    def get_calendar_logs(
+        self,
+        user_id: int,
+        start_date: Optional[date] = None,
+        end_date: Optional[date] = None,
+    ) -> List[WearLogModel]:
+        """
+        Fetches all wear logs for active clothes belonging to user_id.
+        Optionally filtered by date range. Returns logs sorted by worn_date desc.
+        """
+        query = (
+            self.db.query(WearLogModel)
+            .join(ClothModel, WearLogModel.cloth_id == ClothModel.id)
+            .filter(
+                ClothModel.user_id == user_id,
+                ClothModel.is_deleted == False,
+            )
+        )
+        if start_date:
+            query = query.filter(WearLogModel.worn_date >= start_date)
+        if end_date:
+            query = query.filter(WearLogModel.worn_date <= end_date)
+
+        return query.order_by(WearLogModel.worn_date.desc()).all()
+
+    def get_clothes_with_latest_wear(
+        self, user_id: int
+    ) -> List[Tuple[ClothModel, Optional[date]]]:
+        """
+        Returns a list of (ClothModel, max_worn_date) tuples for all active
+        clothes of the user. max_worn_date is None for never-worn items.
+        """
+        results = (
+            self.db.query(ClothModel, func.max(WearLogModel.worn_date).label("latest_wear"))
+            .outerjoin(WearLogModel, ClothModel.id == WearLogModel.cloth_id)
+            .filter(
+                ClothModel.user_id == user_id,
+                ClothModel.is_deleted == False,
+            )
+            .group_by(ClothModel.id)
+            .all()
+        )
+        return [(cloth, latest_wear) for cloth, latest_wear in results]
+
