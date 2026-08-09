@@ -34,6 +34,12 @@ Milestone 3 schemas:
   - WearLogResponse           — wear log response schema
   - CalendarDayResponse       — single-day calendar entry
   - RotationSuggestionsResponse — 14-day rotation dashboard
+
+Milestone 5 schemas:
+  - ClothMatchRequest — bidirectional matchmaking request payload
+  - ClothMatchItem    — simplified cloth projection nested inside ClothResponse.matching_clothes
+  - LookCreate         — Look creation payload
+  - LookResponse       — Look response schema with nested clothing items
 """
 
 from datetime import date, datetime
@@ -104,13 +110,33 @@ class ClothUpdate(BaseModel):
     is_oversize: Optional[bool] = None
 
 
+class ClothMatchItem(BaseModel):
+    """Simplified cloth projection used inside ClothResponse.matching_clothes — no
+    nested matching_clothes of its own, so it can't recurse."""
+    id: int
+    name: str
+    category: ClothCategory
+    color: Optional[str] = None
+    season: Optional[str] = None
+    is_oversize: Optional[bool] = None
+    is_deleted: bool
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class ClothResponse(ClothBase):
     id: int
     user_id: int
     is_deleted: bool
     created_at: datetime
+    matching_clothes: List[ClothMatchItem] = Field(default_factory=list)
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class ClothMatchRequest(BaseModel):
+    matched_cloth_ids: List[int] = Field(..., min_length=1)
 
 
 # ---------------------------------------------------------------------------
@@ -141,3 +167,20 @@ class CalendarDayResponse(BaseModel):
 class RotationSuggestionsResponse(BaseModel):
     forgotten_favorites: List[ClothResponse]
     hidden_gems: List[ClothResponse]
+
+
+# ---------------------------------------------------------------------------
+# Look Collection schemas (Milestone 5)
+# ---------------------------------------------------------------------------
+class LookCreate(BaseModel):
+    name: str = Field(..., min_length=1, max_length=100)
+    cloth_ids: List[int] = Field(..., min_length=1)
+
+
+class LookResponse(BaseModel):
+    id: int
+    name: str
+    created_at: datetime
+    clothes: List[ClothResponse]
+
+    model_config = ConfigDict(from_attributes=True)

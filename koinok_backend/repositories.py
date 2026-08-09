@@ -7,10 +7,11 @@ Isolates database queries and soft-delete logic from API routes.
 
 from datetime import date
 from typing import Dict, List, Optional, Sequence, Tuple
+from fastapi import HTTPException, status
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from db_models import ClothModel, WearLogModel
+from db_models import ClothModel, LookModel, WearLogModel
 import schemas
 
 
@@ -89,6 +90,90 @@ class ClothRepository:
         self.db.refresh(cloth)
         return cloth
 
+    def add_matches(self, cloth: ClothModel, matched_cloth_ids: List[int], user_id: int) -> ClothModel:
+        """
+        Symmetrically links `cloth` with each item in `matched_cloth_ids`.
+
+        Validates every target belongs to user_id and is active, rejects
+        self-links, and writes both directions of each pair in one
+        transaction while skipping pairs that are already linked.
+        """
+        if cloth.id in matched_cloth_ids:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cannot link a clothing item to itself",
+            )
+
+        targets = (
+            self.db.query(ClothModel)
+            .filter(
+                ClothModel.id.in_(matched_cloth_ids),
+                ClothModel.user_id == user_id,
+                ClothModel.is_deleted == False,
+            )
+            .all()
+        )
+        found_ids = {c.id for c in targets}
+        missing = set(matched_cloth_ids) - found_ids
+        if missing:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Clothing items not found: {sorted(missing)}",
+            )
+
+        existing_ids = {c.id for c in cloth.matching_clothes}
+        for target in targets:
+            if target.id not in existing_ids:
+                cloth.matching_clothes.append(target)
+            if cloth.id not in {c.id for c in target.matching_clothes}:
+                target.matching_clothes.append(cloth)
+
+        self.db.commit()
+        self.db.refresh(cloth)
+        return cloth
+
+
+class LookRepository:
+    def __init__(self, db: Session):
+        self.db = db
+
+    def create_look(self, user_id: int, name: str, cloth_ids: List[int]) -> LookModel:
+        """
+        Verifies all cloth_ids belong to user_id and are active, then builds
+        a LookModel bundling them under `name`.
+        """
+        clothes = (
+            self.db.query(ClothModel)
+            .filter(
+                ClothModel.id.in_(cloth_ids),
+                ClothModel.user_id == user_id,
+                ClothModel.is_deleted == False,
+            )
+            .all()
+        )
+        found_ids = {c.id for c in clothes}
+        missing = set(cloth_ids) - found_ids
+        if missing:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid, deleted, or unauthorized cloth_ids: {sorted(missing)}",
+            )
+
+        look = LookModel(user_id=user_id, name=name, clothes=clothes)
+        self.db.add(look)
+        self.db.commit()
+        self.db.refresh(look)
+        return look
+
+    def get_user_looks(self, user_id: int) -> List[LookModel]:
+        """Fetches all Look collections belonging to user_id, newest first."""
+        return (
+            self.db.query(LookModel)
+            .filter(LookModel.user_id == user_id)
+            .order_by(LookModel.created_at.desc())
+            .all()
+        )
+
 
 class WearLogRepository:
     def __init__(self, db: Session):
@@ -118,7 +203,6 @@ class WearLogRepository:
         valid_ids = {c.id for c in valid_clothes}
         invalid = set(cloth_ids) - valid_ids
         if invalid:
-            from fastapi import HTTPException, status
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Invalid or deleted cloth_ids: {sorted(invalid)}",

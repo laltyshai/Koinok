@@ -21,6 +21,7 @@ from fastapi.responses import PlainTextResponse
 
 from routers import auth as auth_router, wardrobe
 from routers import calendar as calendar_router
+from routers import looks as looks_router
 
 
 # ---------------------------------------------------------------------------
@@ -63,6 +64,7 @@ app.add_middleware(
 app.include_router(auth_router.router)
 app.include_router(wardrobe.router)
 app.include_router(calendar_router.router)
+app.include_router(looks_router.router)
 
 # ---------------------------------------------------------------------------
 # Health check

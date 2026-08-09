@@ -108,6 +108,24 @@ def delete_cloth(
     return repo.soft_delete(cloth)
 
 
+@router.post("/{cloth_id}/match", response_model=schemas.ClothResponse, summary="Link clothing items as bidirectional matches")
+def match_cloth(
+    cloth_id: int,
+    match_in: schemas.ClothMatchRequest,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user)
+):
+    """Symmetrically links cloth_id with each id in matched_cloth_ids, returning the refreshed item."""
+    repo = ClothRepository(db)
+    cloth = repo.get_by_id(cloth_id, user_id=current_user.id)
+    if not cloth:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Clothing item not found"
+        )
+    return repo.add_matches(cloth, match_in.matched_cloth_ids, user_id=current_user.id)
+
+
 @router.post("/{cloth_id}/restore", response_model=schemas.ClothResponse, summary="Restore soft-deleted item")
 def restore_cloth(
     cloth_id: int,
