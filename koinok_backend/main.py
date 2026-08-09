@@ -6,26 +6,31 @@ Application entry point.
 Responsibilities:
   - Instantiate the FastAPI app
   - Configure CORS (permissive for Flutter local dev — tighten in production)
-  - Create all SQLAlchemy tables on startup
+  - Apply pending Alembic migrations on startup
   - Mount feature routers
   - Expose GET /health
 """
 
+from pathlib import Path
+
+from alembic import command
+from alembic.config import Config
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import PlainTextResponse
 
-from database import Base, engine
 from routers import auth as auth_router, wardrobe
 from routers import calendar as calendar_router
 
 
 # ---------------------------------------------------------------------------
-# Create tables
+# Apply migrations
 # ---------------------------------------------------------------------------
-# This runs Base.metadata.create_all() at import time so the first request
-# never hits a missing-table error.  In production you'd use Alembic instead.
-Base.metadata.create_all(bind=engine)
+# Runs at import time so the schema is always up to date before the first
+# request, same zero-step behaviour as before, but now backed by real
+# Alembic revisions instead of ad-hoc create_all()/ALTER TABLE.
+_alembic_cfg = Config(str(Path(__file__).parent / "alembic.ini"))
+command.upgrade(_alembic_cfg, "head")
 
 # ---------------------------------------------------------------------------
 # App instance
