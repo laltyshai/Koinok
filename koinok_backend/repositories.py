@@ -24,6 +24,9 @@ class ClothRepository:
         db_cloth = ClothModel(
             name=cloth_in.name,
             category=category_val,
+            color=cloth_in.color,
+            season=cloth_in.season,
+            is_oversize=cloth_in.is_oversize,
             user_id=user_id,
             is_deleted=False,
         )
@@ -47,6 +50,29 @@ class ClothRepository:
         query = self.db.query(ClothModel).filter(ClothModel.user_id == user_id)
         if not include_deleted:
             query = query.filter(ClothModel.is_deleted == False)
+        return query.order_by(ClothModel.created_at.desc()).all()
+
+    def search(
+        self,
+        user_id: int,
+        category: Optional[str] = None,
+        color: Optional[str] = None,
+        season: Optional[str] = None,
+        is_oversize: Optional[bool] = None,
+    ) -> Sequence[ClothModel]:
+        """Dynamically filters active items belonging to user_id by any combination of criteria."""
+        query = self.db.query(ClothModel).filter(
+            ClothModel.user_id == user_id,
+            ClothModel.is_deleted == False,
+        )
+        if category is not None:
+            query = query.filter(ClothModel.category == category)
+        if color is not None:
+            query = query.filter(ClothModel.color == color)
+        if season is not None:
+            query = query.filter(ClothModel.season == season)
+        if is_oversize is not None:
+            query = query.filter(ClothModel.is_oversize == is_oversize)
         return query.order_by(ClothModel.created_at.desc()).all()
 
     def soft_delete(self, cloth: ClothModel) -> ClothModel:
